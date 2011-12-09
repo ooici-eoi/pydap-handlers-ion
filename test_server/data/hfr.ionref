@@ -1,0 +1,3 @@
+[dataset]
+name = "hdf_sample"
+url = "&/test_server/data/hfr.nc"
