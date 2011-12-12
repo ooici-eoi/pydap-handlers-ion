@@ -1,3 +1,4 @@
+
 ---
 **Ocean Observatories Initiative Cyberinfrastructure** 
 **Integrated Observatory Network (ION)** 
@@ -62,17 +63,26 @@ Python packages and environment management:
     Note: This may require Mac's XCode (use XCode 3.3 free version)
 
 - Setup a virtualenv to run COI-services (use any name you like):
-    > mkvirtualenv --no-site-packages --python=python2.7 coi
+    > mkvirtualenv --no-site-packages --python=python2.7 eoi
     Note: Do not use the pyon virtualenv if you are a pyon developer
 
 ###Compiled Library Dependencies
-- hdf5 library 
+**hdf5 library**
 
-     > brew install hdf5
+    brew install hdf5
 
-- netcdf
+**netcdf**
 
-    > brew install netcdf
+    brew install netcdf
+    
+###Python Dependencies
+**numpy**
+
+    pip install numpy
+
+**matplotlib**
+
+    pip install -e git+https://github.com/matplotlib/matplotlib#egg=matplotlib-dev
 
 ###Other OOI-CI Project Dependencies
 
@@ -102,4 +112,3 @@ You can test the ION handler for pydap by starting the test server
     bin/run-server.sh
 
 Then browse to *http://127.0.0.1:8001* to see and interact with the test datasets
-
