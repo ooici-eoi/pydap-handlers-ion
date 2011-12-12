@@ -1,7 +1,6 @@
 from ion.eoi.agent.handler.dap_external_data_handler import DapExternalDataHandler
 import re
 import os
-from configobj import ConfigObj
 from pydap.model import *
 from pydap.handlers.lib import BaseHandler
 from pydap.exceptions import OpenFileError
