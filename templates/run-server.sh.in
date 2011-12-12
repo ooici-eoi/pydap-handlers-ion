@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./bin/paster serve test_server/server.ini
+./bin/start_paster serve test_server/server.ini

@@ -34,7 +34,8 @@ network for Opendap clients.
             'http://ooici.net/releases'
         ],
         install_requires = [
-        	'pyon',
+            'pyon',
+            'eoi-services',
         	'configobj',
             'Pydap>=3.0.1',
             'pydap.handlers.netcdf',

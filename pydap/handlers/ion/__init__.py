@@ -1,3 +1,4 @@
+from ion.eoi.agent.handler.dap_external_data_handler import DapExternalDataHandler
 import re, os
 from configobj import ConfigObj
 from pydap.model import *
@@ -30,7 +31,8 @@ class Handler(BaseHandler):
             raise OpenFileError("Dataset url not specified")
 
         if ds_url.startswith("&"):
-            ds_url = os.environ.get("PWD") + ds_url.replace("&","")
+            full=os.getcwd() + ds_url.replace("&","")
+            ds_url = os.path.abspath(full)
 
         print "Data URL: %s" % ds_url
 
@@ -73,7 +75,7 @@ class Handler(BaseHandler):
                         dat = numpy.array([''.join(row) for row in numpy.asarray(dat)])
                         dtype = 'S'
 
-        #            print dat
+#                    print dat
 
                     dataset_type[name] = BaseType(name=name, data=dat, shape=var.shape, type=dtype, dimensions=var.dimensions, attributes=atts)
 
