@@ -74,10 +74,32 @@ Python packages and environment management:
 
     > brew install netcdf
 
+###Other OOI-CI Project Dependencies
+
+This project requires that both the pyon and eoi-services projects are installed in the same directory as the pydap-handlers-ion project (typically the "Dev/code" directory if the OOI-CI development directory structure is used).  These projects can be obtained using the following commands:
+
+    git clone git@github.com:ooici-eoi/eoi-services.git
+    git clone git@github.com:ooici/pyon.git
+
 #Source
 
 Obtain the eoi-agents project by running:  
 
     git clone git@github.com:ooici-eoi/pydap-handler-ion.git
     cd pydap-handler-ion
+
+#Buildout
+
+Build the project using buildout
+
+    python bootstrap.py
+    bin/buildout
+
+#Running the test server
+
+You can test the ION handler for pydap by starting the test server
+
+    bin/run-server.sh
+
+Then browse to *http://127.0.0.1:8001* to see and interact with the test datasets
 
