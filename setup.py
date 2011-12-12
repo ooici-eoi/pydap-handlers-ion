@@ -36,7 +36,6 @@ network for Opendap clients.
         install_requires = [
             'pyon',
             'eoi-services',
-        	'configobj',
             'Pydap>=3.0.1',
             'pydap.handlers.netcdf',
             'pydap.responses.wms',
@@ -44,6 +43,7 @@ network for Opendap clients.
             'arrayterator>=1.0.1',
             'netCDF4>=0.9.8',
             'cdat_lite>=6.0rc2',
+            'pyyaml==3.10',
         ],
         entry_points="""
             [pydap.handler]

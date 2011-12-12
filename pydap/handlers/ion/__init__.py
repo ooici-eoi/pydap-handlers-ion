@@ -1,11 +1,13 @@
 from ion.eoi.agent.handler.dap_external_data_handler import DapExternalDataHandler
-import re, os
+import re
+import os
 from configobj import ConfigObj
 from pydap.model import *
 from pydap.handlers.lib import BaseHandler
 from pydap.exceptions import OpenFileError
 import numpy
 from netCDF4 import Dataset
+import yaml
 
 class Handler(BaseHandler):
 
@@ -18,16 +20,22 @@ class Handler(BaseHandler):
         print ">> Start parse_constraints"
 
         try:
-            config = ConfigObj(self.filepath, unrepr=True)
+            config = yaml.load(file(self.filepath))
         except:
             message = "Unable to open file '%s'." % self.filepath
             raise OpenFileError(message)
 
 #        ds_url = environ["pydap.handlers.test.ds_url"]
-        dsattrs = config.get('dataset', {}).copy()
-        name = dsattrs.pop('name', os.path.split(self.filepath)[1])
-        ds_url = dsattrs.pop('url', None)
-        if ds_url is None:
+        ds_obj = config["dataset"]
+
+        if "name" in ds_obj:
+            name = ds_obj["name"]
+        else:
+            name = os.path.split(self.filepath)[1]
+
+        if "url" in ds_obj:
+            ds_url = ds_obj["url"]
+        else:
             raise OpenFileError("Dataset url not specified")
 
         if ds_url.startswith("&"):
