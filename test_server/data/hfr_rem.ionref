@@ -1,0 +1,5 @@
+dataset:
+    name: "hfr_remote_sample"
+    external_dataset_id: "29b9se0lnqo2pp34"
+    url: "http://hfrnet.ucsd.edu:8080/thredds/dodsC/HFRNet/USEGC/6km/hourly/RTV"
+    buffer_size: 10000
