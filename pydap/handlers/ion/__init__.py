@@ -1,12 +1,28 @@
-from ion.eoi.agent.handler.dap_external_data_handler import DapExternalDataHandler
 import re
 import os
+import inspect
 from pydap.model import *
 from pydap.handlers.lib import BaseHandler
 from pydap.exceptions import OpenFileError
 import numpy
 from netCDF4 import Dataset
 import yaml
+from arrayterator import Arrayterator
+
+try:
+    from netCDF4 import Dataset as nc
+#    extensions = re.compile(
+#            r"^.*\.(nc|nc4|cdf|netcdf)$",
+#            re.IGNORECASE)
+    var_attrs = lambda var: dict( (a, getattr(var, a))
+            for a in var.ncattrs() )
+    get_value = lambda var: var.getValue()
+    get_typecode = lambda var: var.dtype.char
+except ImportError:
+    raise ImportError("netCDF4 library missing, cannot continue")
+
+def lineno():
+    return inspect.currentframe().f_back.f_lineno
 
 class Handler(BaseHandler):
 
@@ -18,79 +34,162 @@ class Handler(BaseHandler):
     def parse_constraints(self, environ):
         print ">> Start parse_constraints"
 
-        try:
-            config = yaml.load(file(self.filepath))
-        except:
-            message = "Unable to open file '%s'." % self.filepath
-            raise OpenFileError(message)
+        name, ds_id, ds_url, buf_size = get_dataset_info(self)
+        print "DS Info:  name=%s ds_id=%s ds_url=%s buf_size=%s" % (name, ds_id, ds_url, buf_size)
 
-#        ds_url = environ["pydap.handlers.test.ds_url"]
-        ds_obj = config["dataset"]
-
-        if "name" in ds_obj:
-            name = ds_obj["name"]
-        else:
-            name = os.path.split(self.filepath)[1]
-
-        if "url" in ds_obj:
-            ds_url = ds_obj["url"]
-        else:
-            raise OpenFileError("Dataset url not specified")
-
-        if ds_url.startswith("&"):
-            full=os.getcwd() + ds_url.replace("&","")
-            ds_url = os.path.abspath(full)
-
-        print "Data URL: %s" % ds_url
-
-        ds = Dataset(ds_url)
-
-        gbls={}
-        for k in ds.ncattrs():
-            gbls[k]=ds.getncattr(k)
+        # TODO: Call the "temp_DAMS" module to retrieve a BaseDatasetHandler based on the ds_id
 
 
-        dataset_type = DatasetType(name=name, attributes={'NC_BLOBAL': gbls})
+#        from pyon.public import IonObject
+#        dsrc=IonObject("DataSource", name="test")
+#        dsrc.base_data_url=""
+#
+#        dataDesc=IonObject("DapDatasetDescription", name="test")
+#        dataDesc.dataset_path = ds_url
+#        dataDesc.temporal_dimension = "time"
+#
+#        dsh = DapExternalDataHandler(data_provider=None, data_source=dsrc, ext_dataset=None, dataset_desc=dataDesc, update_desc=None)
+#        print dsh
+
+        
+        ds = nc(ds_url)
+
+        dataset_type = DatasetType(name=name, attributes={'NC_BLOBAL': var_attrs(ds)})
 
         fields, queries = environ['pydap.ce']
         fields = fields or [[(name, ())] for name in ds.variables]
-        print fields
-        print queries
+        print "CE Fields: %s" % fields
+        print "CE Queries: %s" % queries
 
 #        for vk in ds.variables:
         for fvar in fields:
+            target = dataset_type
+#            print fvar
             while fvar:
                 name, slice_ = fvar.pop(0)
-                if name in ds.variables:
-                    var = ds.variables[name]
+                if (name in ds.dimensions or not ds.variables[name].dimensions or target is not dataset_type):
+#                    print lineno()
+                    target[name] = get_var(name, ds, slice_, buf_size)
+                elif fvar:
+                    attrs = var_attrs(ds.variables[name])
+                    target.setdefault(name, StructureType(name=name, attributes=attrs))
+                    target = target[name]
+                else:
+                    attrs = var_attrs(ds.variables[name])
+                    grid = target[name] = GridType(name=name, attributes=attrs)
+#                    print lineno()
+                    grid[name] = get_var(name, ds, slice_, buf_size)
+                    slice_ = list(slice_) + [slice(None)] * (len(grid.array.shape) - len(slice_))
+                    for dim, dimslice in zip(ds.variables[name].dimensions, slice_):
+#                        print lineno()
+                        grid[dim] = get_var(dim, ds, dimslice, buf_size)
 
-                    dtype = str(var.dtype)
-                    if dtype == '|S1':
-                        continue
-
-                    atts={}
-                    for ak in var.ncattrs():
-                        atts[ak] = var.getncattr(ak)
-
-                    dat=var[:]
-                    if isinstance(dat, numpy.ma.core.MaskedArray):
-                        dat = dat.data
-                    elif isinstance(dat, numpy.ndarray):
-                        dat = dat
-
-                    if dtype == '|S1':
-                        dat = numpy.array([''.join(row) for row in numpy.asarray(dat)])
-                        dtype = 'S'
-
-#                    print dat
-
-                    dataset_type[name] = BaseType(name=name, data=dat, shape=var.shape, type=dtype, dimensions=var.dimensions, attributes=atts)
+#                if name in ds.variables:
+#                    var = ds.variables[name]
+#
+#                    dtype = str(var.dtype)
+#                    if dtype == '|S1':
+#                        continue
+#
+#                    atts={}
+#                    for ak in var.ncattrs():
+#                        atts[ak] = var.getncattr(ak)
+#
+##                    dat=var[:]
+#                    dat=numpy.array(2)
+#                    if isinstance(dat, numpy.ma.core.MaskedArray):
+#                        dat = dat.data
+#                    elif isinstance(dat, numpy.ndarray):
+#                        dat = dat
+#
+#                    if dtype == '|S1':
+#                        dat = numpy.array([''.join(row) for row in numpy.asarray(dat)])
+#                        dtype = 'S'
+#
+##                    print dat
+#
+#                    dataset_type[name] = BaseType(name=name, data=dat, shape=var.shape, type=dtype, dimensions=var.dimensions, attributes=atts)
 
         dataset_type._set_id()
         dataset_type.close = ds.close
 
         print ">> End parse_constraints"
         return dataset_type
+
+def get_var(name, fp, slice_, buf_size=10000):
+    if name in fp.variables:
+        var = fp.variables[name]
+        if var.shape:
+#            print lineno()
+            data = Arrayterator(var, buf_size)[slice_]
+        else:
+#            print lineno()
+            data = numpy.array(get_value(var))
+        typecode = get_typecode(var)
+        dims = var.dimensions
+        attrs = var_attrs(var)
+    else:
+        for var in fp.variables:
+            var = fp.variables[var]
+            if name in var.dimensions:
+                size = var.shape[
+                        list(var.dimensions).index(name)]
+                break
+#        print lineno()
+        data = numpy.arange(size)[slice_]
+        typecode = data.dtype.char
+        dims, attrs = (name,), {}
+
+    # handle char vars
+    if typecode == 'S1':
+        typecode = 'S'
+        data = numpy.array([''.join(row) for row in numpy.asarray(data)])
+        dims = dims[:-1]
+
+#    print "==> dtype: %s" % type(data)
+
+    return BaseType(name=name, data=data, shape=data.shape,
+            type=typecode, dimensions=dims,
+            attributes=attrs)
+
+def get_dataset_info(self):
+    try:
+        config = yaml.load(file(self.filepath))
+    except:
+        message = "Unable to open file '%s'." % self.filepath
+        raise OpenFileError(message)
+
+#        ds_url = environ["pydap.handlers.test.ds_url"]
+    ds_obj = config["dataset"]
+
+    if "name" in ds_obj:
+        name = ds_obj["name"]
+    else:
+        name = os.path.split(self.filepath)[1]
+
+    if "external_dataset_id" in ds_obj:
+        ds_id = ds_obj["external_dataset_id"]
+    else:
+        raise OpenFileError("ExternalDataset ID not specified")
+
+    if "buffer_size" in ds_obj:
+        buf = ds_obj["buffer_size"]
+    else:
+        buf = 10000
+
+    if "url" in ds_obj:
+        ds_url = ds_obj["url"]
+    else:
+        raise OpenFileError("Dataset url not specified")
+
+    if ds_url.startswith("&"):
+        full=os.getcwd() + ds_url.replace("&","")
+        ds_url = os.path.abspath(full)
+
+
+    return name, ds_id, ds_url, buf
+
+
 
 if __name__ == '__main__':
     import sys
