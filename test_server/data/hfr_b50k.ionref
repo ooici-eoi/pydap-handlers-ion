@@ -1,5 +1,0 @@
-dataset:
-    name: "hfr_sample"
-    external_dataset_id: "39b9se0lnqo2pp34"
-    url: "&/test_server/data/hfr.nc"
-    buffer_size: 50000

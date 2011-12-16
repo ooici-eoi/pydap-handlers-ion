@@ -1,0 +1,5 @@
+dataset:
+    name: "coads_local_sample"
+    external_dataset_id: "coads"
+    url: ""
+    buffer_size: 10000

@@ -1,0 +1,5 @@
+dataset:
+    name: "ssta_sample"
+    external_dataset_id: "ssta"
+    url: ""
+    buffer_size: 10000
