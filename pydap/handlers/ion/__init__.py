@@ -1,3 +1,5 @@
+from pyon.public import IonObject
+from ion.eoi.agent.data_acquisition_management_service_Placeholder import DataAcquisitionManagementServicePlaceholder
 import re
 import os
 import inspect
@@ -27,94 +29,127 @@ def lineno():
 class Handler(BaseHandler):
 
     extensions = re.compile(r"^.*\.ionref$", re.IGNORECASE)
+    damsP = None
 
     def __init__(self, filepath):
         self.filepath = filepath
+        self.damsP = DataAcquisitionManagementServicePlaceholder()
 
     def parse_constraints(self, environ):
-        print ">> Start parse_constraints"
+#        print ">> Start parse_constraints"
 
-        name, ds_id, ds_url, buf_size = get_dataset_info(self)
-        print "DS Info:  name=%s ds_id=%s ds_url=%s buf_size=%s" % (name, ds_id, ds_url, buf_size)
+        ds_name, ds_id, ds_url, buf_size = get_dataset_info(self)
+#        print "DS Info:  name=%s ds_id=%s ds_url=%s buf_size=%s" % (ds_name, ds_id, ds_url, buf_size)
 
-        # TODO: Call the "temp_DAMS" module to retrieve a BaseDatasetHandler based on the ds_id
+        # TODO: Call the "damsP" module to retrieve a BaseDatasetHandler based on the ds_id
+        dsh = self.damsP.get_data_handlers(ds_id=ds_id)
 
-
-#        from pyon.public import IonObject
-#        dsrc=IonObject("DataSource", name="test")
-#        dsrc.base_data_url=""
-#
-#        dataDesc=IonObject("DapDatasetDescription", name="test")
-#        dataDesc.dataset_path = ds_url
-#        dataDesc.temporal_dimension = "time"
-#
-#        dsh = DapExternalDataHandler(data_provider=None, data_source=dsrc, ext_dataset=None, dataset_desc=dataDesc, update_desc=None)
-#        print dsh
-
-        
-        ds = nc(ds_url)
-
-        dataset_type = DatasetType(name=name, attributes={'NC_BLOBAL': var_attrs(ds)})
-
+        #DSH WAY
+        dataset_type = DatasetType(name=ds_name, attributes={'NC_GLOBAL': dsh.get_attributes()})
         fields, queries = environ['pydap.ce']
-        fields = fields or [[(name, ())] for name in ds.variables]
-        print "CE Fields: %s" % fields
-        print "CE Queries: %s" % queries
+        fields = fields or [[(name, ())] for name in dsh.ds.variables]
 
-#        for vk in ds.variables:
+#        print "CE Fields: %s" % fields
+#        print "CE Queries: %s" % queries
+
+        pdr_obj = IonObject("PydapVarDataRequest", name="p_req")
+#        pdr_obj.apply_maskandscale = apply_mask
+
         for fvar in fields:
             target = dataset_type
-#            print fvar
             while fvar:
                 name, slice_ = fvar.pop(0)
-                if (name in ds.dimensions or not ds.variables[name].dimensions or target is not dataset_type):
-#                    print lineno()
-                    target[name] = get_var(name, ds, slice_, buf_size)
+                pdr_obj.name = name
+                pdr_obj.slice = slice_
+                if (name in dsh.ds.dimensions or not dsh.ds.variables[name].dimensions or target is not dataset_type):
+                    nm, dat, tc, di, at = dsh.acquire_data(request=pdr_obj)
+                    target[name] = BaseType(name=nm, data=dat, shape=dat.shape, type=tc, dimensions=di, attributes=at)
                 elif fvar:
-                    attrs = var_attrs(ds.variables[name])
+                    attrs = dsh.get_attributes(var_name=name)
                     target.setdefault(name, StructureType(name=name, attributes=attrs))
                     target = target[name]
                 else:
-                    attrs = var_attrs(ds.variables[name])
+                    attrs = dsh.get_attributes(var_name=name)
                     grid = target[name] = GridType(name=name, attributes=attrs)
-#                    print lineno()
-                    grid[name] = get_var(name, ds, slice_, buf_size)
+                    nm, dat, tc, di, at = dsh.acquire_data(request=pdr_obj)
+                    grid[name] = BaseType(name=nm, data=dat, shape=dat.shape, type=tc, dimensions=di, attributes=at)
                     slice_ = list(slice_) + [slice(None)] * (len(grid.array.shape) - len(slice_))
-                    for dim, dimslice in zip(ds.variables[name].dimensions, slice_):
-#                        print lineno()
-                        grid[dim] = get_var(dim, ds, dimslice, buf_size)
-
-#                if name in ds.variables:
-#                    var = ds.variables[name]
-#
-#                    dtype = str(var.dtype)
-#                    if dtype == '|S1':
-#                        continue
-#
-#                    atts={}
-#                    for ak in var.ncattrs():
-#                        atts[ak] = var.getncattr(ak)
-#
-##                    dat=var[:]
-#                    dat=numpy.array(2)
-#                    if isinstance(dat, numpy.ma.core.MaskedArray):
-#                        dat = dat.data
-#                    elif isinstance(dat, numpy.ndarray):
-#                        dat = dat
-#
-#                    if dtype == '|S1':
-#                        dat = numpy.array([''.join(row) for row in numpy.asarray(dat)])
-#                        dtype = 'S'
-#
-##                    print dat
-#
-#                    dataset_type[name] = BaseType(name=name, data=dat, shape=var.shape, type=dtype, dimensions=var.dimensions, attributes=atts)
+                    for dim, dimslice in zip(dsh.ds.variables[name].dimensions, slice_):
+                        pdr_obj.name=dim
+                        pdr_obj.slice=dimslice
+                        nm, dat, tc, di, at = dsh.acquire_data(request=pdr_obj)
+                        grid[dim] = BaseType(name=nm, data=dat, shape=dat.shape, type=tc, dimensions=di, attributes=at)
 
         dataset_type._set_id()
-        dataset_type.close = ds.close
+        dataset_type.close = dsh.ds.close
 
-        print ">> End parse_constraints"
+#        print ">> End parse_constraints"
         return dataset_type
+
+        # ORIGINAL WAY
+#        ds = nc(ds_url)
+#
+#        dataset_type = DatasetType(name=name, attributes={'NC_GLOBAL': var_attrs(ds)})
+#
+#        fields, queries = environ['pydap.ce']
+#        fields = fields or [[(name, ())] for name in ds.variables]
+#        print "CE Fields: %s" % fields
+#        print "CE Queries: %s" % queries
+#
+##        for vk in ds.variables:
+#        for fvar in fields:
+#            target = dataset_type
+##            print fvar
+#            while fvar:
+#                name, slice_ = fvar.pop(0)
+#                if (name in ds.dimensions or not ds.variables[name].dimensions or target is not dataset_type):
+##                    print lineno()
+#                    target[name] = get_var(name, ds, slice_, buf_size)
+#                elif fvar:
+#                    attrs = var_attrs(ds.variables[name])
+#                    target.setdefault(name, StructureType(name=name, attributes=attrs))
+#                    target = target[name]
+#                else:
+#                    attrs = var_attrs(ds.variables[name])
+#                    grid = target[name] = GridType(name=name, attributes=attrs)
+##                    print lineno()
+#                    grid[name] = get_var(name, ds, slice_, buf_size)
+#                    slice_ = list(slice_) + [slice(None)] * (len(grid.array.shape) - len(slice_))
+#                    for dim, dimslice in zip(ds.variables[name].dimensions, slice_):
+##                        print lineno()
+#                        grid[dim] = get_var(dim, ds, dimslice, buf_size)
+#
+##                if name in ds.variables:
+##                    var = ds.variables[name]
+##
+##                    dtype = str(var.dtype)
+##                    if dtype == '|S1':
+##                        continue
+##
+##                    atts={}
+##                    for ak in var.ncattrs():
+##                        atts[ak] = var.getncattr(ak)
+##
+###                    dat=var[:]
+##                    dat=numpy.array(2)
+##                    if isinstance(dat, numpy.ma.core.MaskedArray):
+##                        dat = dat.data
+##                    elif isinstance(dat, numpy.ndarray):
+##                        dat = dat
+##
+##                    if dtype == '|S1':
+##                        dat = numpy.array([''.join(row) for row in numpy.asarray(dat)])
+##                        dtype = 'S'
+##
+###                    print dat
+##
+##                    dataset_type[name] = BaseType(name=name, data=dat, shape=var.shape, type=dtype, dimensions=var.dimensions, attributes=atts)
+#
+#        dataset_type._set_id()
+#        dataset_type.close = ds.close
+#
+#        print ">> End parse_constraints"
+#        return dataset_type
 
 def get_var(name, fp, slice_, buf_size=10000):
     if name in fp.variables:
