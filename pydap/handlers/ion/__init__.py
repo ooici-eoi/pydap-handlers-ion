@@ -37,6 +37,9 @@ class Handler(BaseHandler):
 
     def parse_constraints(self, environ):
 #        print ">> Start parse_constraints"
+#        import pprint
+#        pprint.pprint("")
+#        pprint.pprint(environ)
 
         ds_name, ds_id, ds_url, buf_size = get_dataset_info(self)
 #        print "DS Info:  name=%s ds_id=%s ds_url=%s buf_size=%s" % (ds_name, ds_id, ds_url, buf_size)
@@ -53,7 +56,6 @@ class Handler(BaseHandler):
 #        print "CE Queries: %s" % queries
 
         pdr_obj = IonObject("PydapVarDataRequest", name="p_req")
-#        pdr_obj.apply_maskandscale = apply_mask
 
         for fvar in fields:
             target = dataset_type
