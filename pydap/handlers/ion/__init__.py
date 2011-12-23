@@ -64,14 +64,17 @@ class Handler(BaseHandler):
                 pdr_obj.name = name
                 pdr_obj.slice = slice_
                 if (name in dsh.ds.dimensions or not dsh.ds.variables[name].dimensions or target is not dataset_type):
+#                    print "==> if"
                     nm, dat, tc, di, at = dsh.acquire_data(request=pdr_obj)
                     target[name] = BaseType(name=nm, data=dat, shape=dat.shape, type=tc, dimensions=di, attributes=at)
                 elif fvar:
-                    attrs = dsh.get_attributes(var_name=name)
+#                    print "==> elif"
+                    attrs = dsh.get_attributes(name)
                     target.setdefault(name, StructureType(name=name, attributes=attrs))
                     target = target[name]
                 else:
-                    attrs = dsh.get_attributes(var_name=name)
+#                    print "==> else"
+                    attrs = dsh.get_attributes(name)
                     grid = target[name] = GridType(name=name, attributes=attrs)
                     nm, dat, tc, di, at = dsh.acquire_data(request=pdr_obj)
                     grid[name] = BaseType(name=nm, data=dat, shape=dat.shape, type=tc, dimensions=di, attributes=at)
